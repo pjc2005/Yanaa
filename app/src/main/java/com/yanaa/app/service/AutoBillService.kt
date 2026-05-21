@@ -72,11 +72,22 @@ class AutoBillService : AccessibilityService() {
     }
 
     private fun analyzeBitmap(bitmap: Bitmap, packageName: String) {
+        // Ensure bitmap is ARGB_8888 (takeScreenshot may return HARDWARE bitmaps)
+        val argbBitmap = if (bitmap.config != Bitmap.Config.ARGB_8888) {
+            bitmap.copy(Bitmap.Config.ARGB_8888, false)
+        } else {
+            bitmap
+        }
+        if (argbBitmap == null) {
+            showEditDialog("", "", packageName)
+            return
+        }
+
         var amountText = ""
         var merchantText = ""
 
         if (yoloDetector.isReady()) {
-            val detections = yoloDetector.detect(bitmap)
+            val detections = yoloDetector.detect(argbBitmap)
 
             for (detection in detections) {
                 val rect = detection.rect
@@ -84,13 +95,13 @@ class AutoBillService : AccessibilityService() {
 
                 val x = rect.left.toInt().coerceAtLeast(0)
                 val y = rect.top.toInt().coerceAtLeast(0)
-                val w = rect.width().toInt().coerceAtMost(bitmap.width - x)
-                val h = rect.height().toInt().coerceAtMost(bitmap.height - y)
+                val w = rect.width().toInt().coerceAtMost(argbBitmap.width - x)
+                val h = rect.height().toInt().coerceAtMost(argbBitmap.height - y)
 
                 if (w <= 0 || h <= 0) continue
 
                 val cropped = try {
-                    Bitmap.createBitmap(bitmap, x, y, w, h)
+                    Bitmap.createBitmap(argbBitmap, x, y, w, h)
                 } catch (e: Exception) {
                     continue
                 }
