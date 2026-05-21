@@ -39,7 +39,7 @@ fun ProfileTabScreen(viewModel: RecordViewModel = viewModel()) {
         if (uri != null) {
             scope.launch {
                 try {
-                    val json = DataExporter.exportToJson(context, records)
+                    val json = DataExporter.exportToJson(records)
                     context.contentResolver.openOutputStream(uri)?.use { out ->
                         out.write(json.toByteArray())
                     }
@@ -59,7 +59,7 @@ fun ProfileTabScreen(viewModel: RecordViewModel = viewModel()) {
             scope.launch {
                 try {
                     val imported = withContext(Dispatchers.IO) {
-                        DataExporter.importFromJson(context, uri)
+                        DataExporter.importFromUri(context, uri)
                     }
                     if (imported.isNotEmpty()) {
                         val db = AppDatabase.getInstance(context)
