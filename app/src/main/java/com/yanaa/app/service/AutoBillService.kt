@@ -51,24 +51,88 @@ class AutoBillService : AccessibilityService() {
     private fun captureAndAnalyze(packageName: String) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return
 
-        takeScreenshot(
-            Display.DEFAULT_DISPLAY,
-            executor,
-            object : TakeScreenshotCallback {
-                override fun onSuccess(screenshotResult: ScreenshotResult) {
-                    val hardwareBuffer = screenshotResult.hardwareBuffer
-                    val bitmap = Bitmap.wrapHardwareBuffer(hardwareBuffer, screenshotResult.colorSpace)
-                    if (bitmap != null) {
-                        analyzeBitmap(bitmap, packageName)
+        try {
+            takeScreenshot(
+                Display.DEFAULT_DISPLAY,
+                executor,
+                object : TakeScreenshotCallback {
+                    override fun onSuccess(screenshotResult: ScreenshotResult) {
+                        try {
+                            val hardwareBuffer = screenshotResult.hardwareBuffer
+                            // Convert HARDWARE buffer to mutable ARGB_8888 Bitmap
+                            val bitmap = Bitmap.wrapHardwareBuffer(hardwareBuffer, screenshotResult.colorSpace)
+                            if (bitmap != null) {
+                                analyzeBitmap(bitmap, packageName)
+                            } else {
+                                // Screenshot failed, try accessibility tree
+                                extractFromAccessibilityTree(packageName)
+                            }
+                            hardwareBuffer.close()
+                        } catch (e: Exception) {
+                            android.util.Log.e("AutoBillService", "Screenshot processing error: ${e.message}")
+                            extractFromAccessibilityTree(packageName)
+                        }
                     }
-                    hardwareBuffer.close()
-                }
 
-                override fun onFailure(errorCode: Int) {
-                    android.util.Log.e("AutoBillService", "Screenshot failed: code=$errorCode")
+                    override fun onFailure(errorCode: Int) {
+                        android.util.Log.e("AutoBillService", "Screenshot failed: code=$errorCode")
+                        extractFromAccessibilityTree(packageName)
+                    }
+                }
+            )
+        } catch (e: Exception) {
+            android.util.Log.e("AutoBillService", "takeScreenshot threw: ${e.message}")
+            extractFromAccessibilityTree(packageName)
+        }
+    }
+
+    /**
+     * Fallback: parse the accessibility node tree to extract payment info directly
+     */
+    private fun extractFromAccessibilityTree(packageName: String) {
+        val root = rootInActiveWindow ?: run {
+            // Still show the edit dialog so user knows it triggered
+            showEditDialog("", "", packageName)
+            return
+        }
+
+        val collectedTexts = mutableListOf<String>()
+
+        // Walk the tree and collect all text
+        fun walk(node: android.view.accessibility.AccessibilityNodeInfo?) {
+            if (node == null) return
+            if (node.text != null) collectedTexts.add(node.text.toString())
+            for (i in 0 until node.childCount) {
+                walk(node.getChild(i))
+            }
+        }
+        walk(root)
+
+        var amountText = ""
+        var merchantText = ""
+
+        for (text in collectedTexts) {
+            // Look for amount patterns: ¥123.45, 123.45元
+            val amountMatch = Regex("[¥￥]?\\d+\\.?\\d{0,2}[元]?").find(text)
+            if (amountMatch != null && amountText.isEmpty()) {
+                amountText = amountMatch.value.filter { it.isDigit() || it == '.' }
+            }
+
+            // Look for merchant/store name (common patterns in payment success pages)
+            if (text.contains("商户") || text.contains("收款方") || text.contains("商家")) {
+                val parts = text.split("商户|收款方|商家".toRegex())
+                if (parts.size >= 2) {
+                    merchantText = parts[1].trim()
                 }
             }
-        )
+
+            // Detect payment success keywords
+            if (text.contains("支付成功") || text.contains("付款成功")) {
+                android.util.Log.d("AutoBillService", "Payment success detected from: $packageName")
+            }
+        }
+
+        showEditDialog(amountText, merchantText, packageName)
     }
 
     private fun analyzeBitmap(bitmap: Bitmap, packageName: String) {
