@@ -18,7 +18,7 @@ class AutoBillService : AccessibilityService() {
     private lateinit var ocrExtractor: OCRExtractor
     private var lastProcessedPackage = ""
     private var lastProcessedTime = 0L
-    private val debounceInterval = 3000L
+    private val debounceInterval = 2000L
     private val executor = Executors.newSingleThreadExecutor()
     private val mainHandler = Handler(Looper.getMainLooper())
 
@@ -58,12 +58,16 @@ class AutoBillService : AccessibilityService() {
         var isPaymentPage = false
 
         for (text in eventTexts) {
-            if (text.contains("支付成功") || text.contains("付款成功") || text.contains("支付金额")) {
+            android.util.Log.d("AutoBillService", "Event text: [$text] (from $packageName)")
+
+            // Only 支付成功/付款成功 triggers immediately - nothing else
+            if (text.contains("支付成功") || text.contains("付款成功")) {
                 isPaymentPage = true
             }
-            val amountMatch = Regex("[¥￥]?\\d+\\.?\\d{0,2}[元]?").find(text)
-            if (amountMatch != null && amountText.isEmpty()) {
-                amountText = amountMatch.value.filter { it.isDigit() || it == '.' }
+            // Extract amount with strict format for pre-fill if available
+            val strictAmount = Regex("[¥￥]\\d+\\.\\d{2}|\\d+\\.\\d{2}[元]").find(text)
+            if (strictAmount != null && amountText.isEmpty()) {
+                amountText = strictAmount.value.filter { it.isDigit() || it == '.' }
             }
             if (text.contains("商户") || text.contains("收款方") || text.contains("商家")) {
                 val parts = text.split("商户|收款方|商家".toRegex())
@@ -71,12 +75,15 @@ class AutoBillService : AccessibilityService() {
             }
         }
 
-        if (isPaymentPage || amountText.isNotEmpty()) {
+        // Only trigger immediately on payment success page
+        if (isPaymentPage) {
+            android.util.Log.d("AutoBillService", "Payment success detected, showing dialog")
             showEditDialog(amountText, merchantText, packageName)
             return
         }
 
-        // Fallback: try screenshot + accessibility tree after a delay
+        // Delayed fallback: walk the accessibility tree after a short delay
+        // The tree contains text from node.text fields which is richer than event.text
         mainHandler.postDelayed({
             captureAndAnalyze(packageName)
         }, 1200)
@@ -121,14 +128,11 @@ class AutoBillService : AccessibilityService() {
     }
 
     /**
-     * Fallback: parse the accessibility node tree to extract payment info directly
+     * Fallback: parse the accessibility node tree to extract payment info directly.
+     * Only shows dialog if payment success is confirmed.
      */
     private fun extractFromAccessibilityTree(packageName: String) {
-        val root = rootInActiveWindow ?: run {
-            // Still show the edit dialog so user knows it triggered
-            showEditDialog("", "", packageName)
-            return
-        }
+        val root = rootInActiveWindow ?: return
 
         val collectedTexts = mutableListOf<String>()
 
@@ -136,6 +140,7 @@ class AutoBillService : AccessibilityService() {
         fun walk(node: android.view.accessibility.AccessibilityNodeInfo?) {
             if (node == null) return
             if (node.text != null) collectedTexts.add(node.text.toString())
+            if (node.contentDescription != null) collectedTexts.add(node.contentDescription.toString())
             for (i in 0 until node.childCount) {
                 walk(node.getChild(i))
             }
@@ -144,29 +149,26 @@ class AutoBillService : AccessibilityService() {
 
         var amountText = ""
         var merchantText = ""
+        var isSuccessPage = false
 
         for (text in collectedTexts) {
-            // Look for amount patterns: ¥123.45, 123.45元
-            val amountMatch = Regex("[¥￥]?\\d+\\.?\\d{0,2}[元]?").find(text)
+            if (text.contains("支付成功") || text.contains("付款成功")) {
+                isSuccessPage = true
+            }
+            val amountMatch = Regex("[¥￥]\\d+\\.\\d{2}|\\d+\\.\\d{2}[元]").find(text)
             if (amountMatch != null && amountText.isEmpty()) {
                 amountText = amountMatch.value.filter { it.isDigit() || it == '.' }
             }
-
-            // Look for merchant/store name (common patterns in payment success pages)
             if (text.contains("商户") || text.contains("收款方") || text.contains("商家")) {
                 val parts = text.split("商户|收款方|商家".toRegex())
-                if (parts.size >= 2) {
-                    merchantText = parts[1].trim()
-                }
-            }
-
-            // Detect payment success keywords
-            if (text.contains("支付成功") || text.contains("付款成功")) {
-                android.util.Log.d("AutoBillService", "Payment success detected from: $packageName")
+                if (parts.size >= 2) merchantText = parts[1].trim()
             }
         }
 
-        showEditDialog(amountText, merchantText, packageName)
+        // Only show dialog if we're confident this is a payment success page
+        if (isSuccessPage) {
+            showEditDialog(amountText, merchantText, packageName)
+        }
     }
 
     private fun analyzeBitmap(bitmap: Bitmap, packageName: String) {
@@ -214,8 +216,10 @@ class AutoBillService : AccessibilityService() {
             }
         }
 
-        // Always show the edit dialog when a payment screen is detected
-        showEditDialog(amountText, merchantText, packageName)
+        // Only show dialog if we found content or if this is a confirmed payment page
+        if (amountText.isNotEmpty() || merchantText.isNotEmpty()) {
+            showEditDialog(amountText, merchantText, packageName)
+        }
     }
 
     private fun showEditDialog(amount: String, merchant: String, packageName: String) {
