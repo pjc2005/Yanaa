@@ -71,7 +71,7 @@ fun StatsTabScreen(viewModel: RecordViewModel = viewModel()) {
                 Column(modifier = Modifier.padding(20.dp)) {
                     Text("本月总支出", style = MaterialTheme.typography.titleMedium,
                         color = MaterialTheme.colorScheme.onTertiaryContainer)
-                    Text("¥${String.format("%.2f", monthTotal)}",
+                    Text("¥${"%.2f".format( monthTotal)}",
                         style = MaterialTheme.typography.headlineLarge,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onTertiaryContainer)
@@ -131,7 +131,7 @@ private fun CategoryBar(category: String, total: Double, count: Int, maxAmount: 
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Text(category, style = MaterialTheme.typography.bodyMedium)
-                Text("¥${String.format("%.2f", total)} (${count}笔)",
+                Text("¥${"%.2f".format( total)} (${count}笔)",
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.Medium)
             }
@@ -169,7 +169,7 @@ private fun MonthBar(label: String, total: Double, maxAmount: Double) {
             trackColor = MaterialTheme.colorScheme.surfaceVariant,
         )
         Spacer(Modifier.width(8.dp))
-        Text("¥${String.format("%.0f", total)}",
+        Text("¥${"%.0f".format( total)}",
             style = MaterialTheme.typography.bodySmall,
             modifier = Modifier.width(60.dp))
     }

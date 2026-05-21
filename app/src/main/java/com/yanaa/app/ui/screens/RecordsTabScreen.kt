@@ -10,8 +10,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.yanaa.app.data.Record
 import com.yanaa.app.data.RecordViewModel
+import com.yanaa.app.ui.components.RecordCard
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -19,9 +19,7 @@ import java.util.*
 fun RecordsTabScreen(viewModel: RecordViewModel = viewModel()) {
     val records by viewModel.allRecords.collectAsState(initial = emptyList())
     val dateFormat = remember { SimpleDateFormat("yyyy年MM月dd日", Locale.CHINESE) }
-    val timeFormat = remember { SimpleDateFormat("HH:mm", Locale.getDefault()) }
 
-    // Group records by date (year + dayOfYear)
     val grouped = remember(records) {
         records.groupBy { record ->
             val cal = Calendar.getInstance()
@@ -47,7 +45,6 @@ fun RecordsTabScreen(viewModel: RecordViewModel = viewModel()) {
                 val dayTotal = dayRecords.sumOf { it.amount }
                 val dayLabel = dateFormat.format(Date(dayRecords.first().timestamp))
 
-                // Date header
                 item {
                     Row(
                         modifier = Modifier
@@ -57,7 +54,7 @@ fun RecordsTabScreen(viewModel: RecordViewModel = viewModel()) {
                     ) {
                         Text(dayLabel, style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.SemiBold)
-                        Text("-¥${String.format("%.2f", dayTotal)}",
+                        Text("-¥${"%.2f".format( dayTotal)}",
                             style = MaterialTheme.typography.titleSmall,
                             color = MaterialTheme.colorScheme.error,
                             fontWeight = FontWeight.Medium)
