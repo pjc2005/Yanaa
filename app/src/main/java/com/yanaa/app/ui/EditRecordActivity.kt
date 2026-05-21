@@ -33,16 +33,29 @@ class EditRecordActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val amount = intent.getStringExtra("amount") ?: ""
+        val recordId = intent.getLongExtra("recordId", -1L)
 
         setContent {
             YanaaTheme {
                 EditRecordScreen(
                     initialAmount = amount,
+                    recordId = recordId,
                     context = this@EditRecordActivity,
                     onSave = { record ->
                         val db = AppDatabase.getInstance(this@EditRecordActivity)
                         MainScope().launch {
-                            db.recordDao().insert(record)
+                            if (recordId > 0) {
+                                db.recordDao().update(record.copy(id = recordId))
+                            } else {
+                                db.recordDao().insert(record)
+                            }
+                            finish()
+                        }
+                    },
+                    onDelete = {
+                        val db = AppDatabase.getInstance(this@EditRecordActivity)
+                        MainScope().launch {
+                            db.recordDao().deleteById(recordId)
                             finish()
                         }
                     },
@@ -68,8 +81,10 @@ private val categoryIcons = mapOf(
 @Composable
 fun EditRecordScreen(
     initialAmount: String,
+    recordId: Long = -1L,
     context: android.content.Context,
     onSave: (Record) -> Unit,
+    onDelete: () -> Unit = {},
     onCancel: () -> Unit
 ) {
     val categories = remember { CategoryManager.getAll(context) }
@@ -78,6 +93,8 @@ fun EditRecordScreen(
     var selectedCategory by remember { mutableStateOf("") }
     var selectedSubcategory by remember { mutableStateOf("") }
     var recordType by remember { mutableStateOf("expense") }
+    var isEditing by remember { mutableStateOf(recordId > 0) }
+    var showDeleteConfirm by remember { mutableStateOf(false) }
     var showDatePicker by remember { mutableStateOf(false) }
     var showTimePicker by remember { mutableStateOf(false) }
     var selectedDate by remember { mutableStateOf(System.currentTimeMillis()) }
@@ -91,16 +108,38 @@ fun EditRecordScreen(
         categories.find { it.name == selectedCategory }?.subcategories ?: emptyList()
     }
 
+    // Load existing record for editing
+    LaunchedEffect(recordId) {
+        if (recordId > 0) {
+            val db = AppDatabase.getInstance(context)
+            val record = db.recordDao().getById(recordId)
+            if (record != null) {
+                amount = if (record.amount > 0) String.format("%.2f", record.amount) else ""
+                recordType = record.type
+                selectedCategory = record.category
+                selectedSubcategory = record.subcategory
+                note = record.note
+                selectedDate = record.timestamp
+            }
+        }
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("记一笔") },
+                title = { Text(if (isEditing) "编辑" else "记一笔") },
                 navigationIcon = {
                     IconButton(onClick = onCancel) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
                     }
                 },
                 actions = {
+                    if (isEditing) {
+                        IconButton(onClick = { showDeleteConfirm = true }) {
+                            Icon(Icons.Default.Delete, contentDescription = "删除",
+                                tint = MaterialTheme.colorScheme.error)
+                        }
+                    }
                     TextButton(onClick = {
                         val amountValue = amount.toDoubleOrNull() ?: 0.0
                         if (amountValue > 0 && selectedCategory.isNotEmpty()) {
@@ -329,6 +368,25 @@ fun EditRecordScreen(
 
             Spacer(Modifier.height(24.dp))
         }
+    }
+
+    // Delete confirmation dialog
+    if (showDeleteConfirm) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirm = false },
+            title = { Text("删除记录") },
+            text = { Text("确定要删除这条记录吗？此操作不可撤销。") },
+            confirmButton = {
+                TextButton(onClick = { onDelete() },
+                    colors = ButtonDefaults.textButtonColors(
+                        contentColor = MaterialTheme.colorScheme.error
+                    )
+                ) { Text("删除") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteConfirm = false }) { Text("取消") }
+            }
+        )
     }
 
     // Date picker dialog

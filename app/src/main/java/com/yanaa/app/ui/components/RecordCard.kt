@@ -12,14 +12,14 @@ import java.text.SimpleDateFormat
 import java.util.*
 
 @Composable
-fun RecordCard(record: Record) {
+fun RecordCard(record: Record, onClick: () -> Unit = {}) {
     val dateFormat = remember { SimpleDateFormat("MM/dd HH:mm", Locale.getDefault()) }
     val isExpense = record.type == "expense"
     val amountColor = if (isExpense) MaterialTheme.colorScheme.error
                       else MaterialTheme.colorScheme.tertiary
     val prefix = if (isExpense) "-" else "+"
 
-    Card(modifier = Modifier.fillMaxWidth()) {
+    Card(onClick = onClick, modifier = Modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()

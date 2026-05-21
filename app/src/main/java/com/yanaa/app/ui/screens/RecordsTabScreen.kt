@@ -1,5 +1,6 @@
 package com.yanaa.app.ui.screens
 
+import android.content.Intent
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -7,11 +8,13 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.yanaa.app.data.RecordViewModel
 import com.yanaa.app.ui.components.RecordCard
+import com.yanaa.app.ui.EditRecordActivity
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -19,6 +22,7 @@ import java.util.*
 fun RecordsTabScreen(viewModel: RecordViewModel = viewModel()) {
     val records by viewModel.allRecords.collectAsState(initial = emptyList())
     val dateFormat = remember { SimpleDateFormat("yyyy年MM月dd日", Locale.CHINESE) }
+    val context = LocalContext.current
 
     val grouped = remember(records) {
         records.groupBy { record ->
@@ -62,7 +66,13 @@ fun RecordsTabScreen(viewModel: RecordViewModel = viewModel()) {
                 }
 
                 items(dayRecords, key = { it.id }) { record ->
-                    RecordCard(record)
+                    RecordCard(record, onClick = {
+                        val intent = Intent(context, EditRecordActivity::class.java).apply {
+                            putExtra("recordId", record.id)
+                            putExtra("amount", String.format("%.2f", record.amount))
+                        }
+                        context.startActivity(intent)
+                    })
                 }
             }
         }

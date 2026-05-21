@@ -4,15 +4,18 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
+import android.content.Intent
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.yanaa.app.data.Period
 import com.yanaa.app.data.RecordViewModel
 import com.yanaa.app.ui.components.RecordCard
+import com.yanaa.app.ui.EditRecordActivity
 
 @Composable
 fun HomeTabScreen(viewModel: RecordViewModel = viewModel()) {
@@ -22,6 +25,7 @@ fun HomeTabScreen(viewModel: RecordViewModel = viewModel()) {
     val balance by viewModel.balance.collectAsState(initial = 0.0)
     val count by viewModel.count.collectAsState(initial = 0)
     val currentPeriod by viewModel.period.collectAsState()
+    val context = LocalContext.current
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -148,7 +152,13 @@ fun HomeTabScreen(viewModel: RecordViewModel = viewModel()) {
             }
         } else {
             items(recentRecords, key = { it.id }) { record ->
-                RecordCard(record)
+                RecordCard(record, onClick = {
+                    val intent = Intent(context, EditRecordActivity::class.java).apply {
+                        putExtra("recordId", record.id)
+                        putExtra("amount", String.format("%.2f", record.amount))
+                    }
+                    context.startActivity(intent)
+                })
             }
         }
     }
