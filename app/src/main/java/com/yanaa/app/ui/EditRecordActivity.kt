@@ -34,11 +34,15 @@ class EditRecordActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         val amount = intent.getStringExtra("amount") ?: ""
         val recordId = intent.getLongExtra("recordId", -1L)
+        val merchant = intent.getStringExtra("merchant") ?: ""
+        val source = intent.getStringExtra("source") ?: ""
 
         setContent {
             YanaaTheme {
                 EditRecordScreen(
                     initialAmount = amount,
+                    initialNote = if (merchant.isNotEmpty()) merchant else "",
+                    initialSource = source,
                     recordId = recordId,
                     context = this@EditRecordActivity,
                     onSave = { record ->
@@ -81,6 +85,8 @@ private val categoryIcons = mapOf(
 @Composable
 fun EditRecordScreen(
     initialAmount: String,
+    initialNote: String = "",
+    initialSource: String = "",
     recordId: Long = -1L,
     context: android.content.Context,
     onSave: (Record) -> Unit,
@@ -89,7 +95,7 @@ fun EditRecordScreen(
 ) {
     val categories = remember { CategoryManager.getAll(context) }
     var amount by remember { mutableStateOf(initialAmount) }
-    var note by remember { mutableStateOf("") }
+    var note by remember { mutableStateOf(initialNote) }
     var selectedCategory by remember { mutableStateOf("") }
     var selectedSubcategory by remember { mutableStateOf("") }
     var recordType by remember { mutableStateOf("expense") }
@@ -189,6 +195,34 @@ fun EditRecordScreen(
             )
 
             Spacer(Modifier.height(12.dp))
+
+            // Source indicator (auto-detected)
+            if (initialSource.isNotEmpty() && initialSource != "manual") {
+                val sourceLabel = when (initialSource) {
+                    "com.eg.android.AlipayGphone" -> "支付宝"
+                    "com.tencent.mm" -> "微信"
+                    else -> initialSource
+                }
+                Surface(
+                    color = MaterialTheme.colorScheme.secondaryContainer,
+                    shape = MaterialTheme.shapes.small,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(Icons.Default.CameraAlt, contentDescription = null,
+                            modifier = Modifier.size(16.dp),
+                            tint = MaterialTheme.colorScheme.onSecondaryContainer)
+                        Spacer(Modifier.width(6.dp))
+                        Text("来自 $sourceLabel 自动识别",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer)
+                    }
+                }
+                Spacer(Modifier.height(8.dp))
+            }
 
             // Expense / Income toggle
             SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {

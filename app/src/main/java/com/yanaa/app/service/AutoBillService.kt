@@ -72,41 +72,41 @@ class AutoBillService : AccessibilityService() {
     }
 
     private fun analyzeBitmap(bitmap: Bitmap, packageName: String) {
-        if (!yoloDetector.isReady()) return
-
-        val detections = yoloDetector.detect(bitmap)
         var amountText = ""
         var merchantText = ""
 
-        for (detection in detections) {
-            val rect = detection.rect
-            if (rect.width() <= 0f || rect.height() <= 0f) continue
+        if (yoloDetector.isReady()) {
+            val detections = yoloDetector.detect(bitmap)
 
-            val x = rect.left.toInt().coerceAtLeast(0)
-            val y = rect.top.toInt().coerceAtLeast(0)
-            val w = rect.width().toInt().coerceAtMost(bitmap.width - x)
-            val h = rect.height().toInt().coerceAtMost(bitmap.height - y)
+            for (detection in detections) {
+                val rect = detection.rect
+                if (rect.width() <= 0f || rect.height() <= 0f) continue
 
-            if (w <= 0 || h <= 0) continue
+                val x = rect.left.toInt().coerceAtLeast(0)
+                val y = rect.top.toInt().coerceAtLeast(0)
+                val w = rect.width().toInt().coerceAtMost(bitmap.width - x)
+                val h = rect.height().toInt().coerceAtMost(bitmap.height - y)
 
-            val cropped = try {
-                Bitmap.createBitmap(bitmap, x, y, w, h)
-            } catch (e: Exception) {
-                continue
-            }
+                if (w <= 0 || h <= 0) continue
 
-            val text = ocrExtractor.extractTextSync(cropped) ?: continue
+                val cropped = try {
+                    Bitmap.createBitmap(bitmap, x, y, w, h)
+                } catch (e: Exception) {
+                    continue
+                }
 
-            if (detection.label == "amount") {
-                amountText = text.filter { it.isDigit() || it == '.' }
-            } else if (detection.label == "merchant") {
-                merchantText = text
+                val text = ocrExtractor.extractTextSync(cropped) ?: continue
+
+                if (detection.label == "amount") {
+                    amountText = text.filter { it.isDigit() || it == '.' }
+                } else if (detection.label == "merchant") {
+                    merchantText = text
+                }
             }
         }
 
-        if (amountText.isNotEmpty()) {
-            showEditDialog(amountText, merchantText, packageName)
-        }
+        // Always show the edit dialog when a payment screen is detected
+        showEditDialog(amountText, merchantText, packageName)
     }
 
     private fun showEditDialog(amount: String, merchant: String, packageName: String) {
