@@ -75,12 +75,15 @@ class YOLODetector(private val context: Context) {
 
         // Run inference
         val outputs = mapOf(
-            0 to outputLocations.buffer.rewind(),
-            1 to outputClasses.buffer.rewind(),
-            2 to outputScores.buffer.rewind(),
-            3 to numDetections.buffer.rewind()
+            0 to outputLocations,
+            1 to outputClasses,
+            2 to outputScores,
+            3 to numDetections
         )
-        interp.run(tensorImage.tensorBuffer.buffer.rewind(), outputs)
+        interp.runForMultipleInputsOutputs(
+            arrayOf(tensorImage.tensorBuffer),
+            outputs
+        )
 
         // Parse results
         val locations = outputLocations.floatArray
