@@ -31,12 +31,6 @@ class AutoBillService : AccessibilityService() {
         super.onCreate()
         yoloDetector = YOLODetector(this)
         ocrExtractor = OCRExtractor()
-        executor.execute {
-            val ready = yoloDetector.initialize()
-            if (!ready) {
-                android.util.Log.w("AutoBillService", "YOLO model not loaded")
-            }
-        }
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent) {
@@ -86,16 +80,22 @@ class AutoBillService : AccessibilityService() {
 
         for (detection in detections) {
             val rect = detection.rect
-            if (rect.width() <= 0 || rect.height() <= 0) continue
+            if (rect.width() <= 0f || rect.height() <= 0f) continue
+
+            val x = rect.left.toInt().coerceAtLeast(0)
+            val y = rect.top.toInt().coerceAtLeast(0)
+            val w = rect.width().toInt().coerceAtMost(bitmap.width - x)
+            val h = rect.height().toInt().coerceAtMost(bitmap.height - y)
+
+            if (w <= 0 || h <= 0) continue
 
             val cropped = try {
-                Bitmap.createBitmap(bitmap, rect.left, rect.top, rect.width(), rect.height())
+                Bitmap.createBitmap(bitmap, x, y, w, h)
             } catch (e: Exception) {
                 continue
             }
 
             val text = ocrExtractor.extractTextSync(cropped) ?: continue
-            cropped.recycle()
 
             if (detection.label == "amount") {
                 amountText = text.filter { it.isDigit() || it == '.' }

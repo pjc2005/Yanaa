@@ -2,16 +2,17 @@ package com.yanaa.app.ml
 
 import android.content.Context
 import android.graphics.Bitmap
-import android.graphics.Rect
+import android.graphics.RectF
+import org.tensorflow.lite.DataType
 import org.tensorflow.lite.Interpreter
-import java.io.BufferedReader
-import java.io.InputStreamReader
-import java.nio.ByteBuffer
-import java.nio.ByteOrder
-import java.nio.MappedByteBuffer
+import org.tensorflow.lite.support.common.FileUtil
+import org.tensorflow.lite.support.image.ImageProcessor
+import org.tensorflow.lite.support.image.TensorImage
+import org.tensorflow.lite.support.image.ops.ResizeOp
+import org.tensorflow.lite.support.tensorbuffer.TensorBuffer
 
 data class DetectionResult(
-    val rect: Rect,
+    val rect: RectF,
     val label: String,
     val confidence: Float
 )
@@ -19,151 +20,97 @@ data class DetectionResult(
 class YOLODetector(private val context: Context) {
     private var interpreter: Interpreter? = null
     private var labels: List<String> = emptyList()
-    private var isInitialized = false
+    private val modelFilename = "yolo_model.tflite"
+    private val labelFilename = "labels.txt"
 
-    data class BoundingBox(
-        var x1: Float, var y1: Float,
-        var x2: Float, var y2: Float,
-        var cx: Float, var cy: Float,
-        var w: Float, var h: Float,
-        var cnf: Float, var cls: Int,
-        var label: String = ""
-    )
+    // EfficientDet output params
+    private val inputImageWidth = 320
+    private val inputImageHeight = 320
+    private val outputLocationsShape = intArrayOf(1, 100, 4)
+    private val outputClassesShape = intArrayOf(1, 100)
+    private val outputScoresShape = intArrayOf(1, 100)
+    private val numDetectionsShape = intArrayOf(1)
 
-    fun initialize(): Boolean {
-        return try {
-            val model = loadModelFile("yolo_model.tflite")
-            interpreter = Interpreter(model)
-            labels = loadLabels("labels.txt")
-            isInitialized = true
-            true
+    init {
+        try {
+            val modelBuffer = FileUtil.loadMappedFile(context, modelFilename)
+            interpreter = Interpreter(modelBuffer)
+            loadLabels()
         } catch (e: Exception) {
-            isInitialized = false
-            false
+            e.printStackTrace()
         }
     }
 
-    fun isReady(): Boolean = isInitialized
+    private fun loadLabels() {
+        val labelsList = mutableListOf<String>()
+        try {
+            context.assets.open(labelFilename).bufferedReader().use { reader ->
+                reader.forEachLine { line ->
+                    if (line.isNotBlank()) labelsList.add(line.trim())
+                }
+            }
+        } catch (e: Exception) {
+            labelsList.addAll(listOf("amount", "merchant"))
+        }
+        labels = labelsList
+    }
+
+    fun isReady(): Boolean = interpreter != null
 
     fun detect(bitmap: Bitmap): List<DetectionResult> {
-        if (!isInitialized) return emptyList()
+        val interp = interpreter ?: return emptyList()
 
-        val interpreter = interpreter ?: return emptyList()
+        // Preprocess: resize to 320x320
+        val imageProcessor = ImageProcessor.Builder()
+            .add(ResizeOp(inputImageHeight, inputImageWidth, ResizeOp.ResizeMethod.BILINEAR))
+            .build()
+        var tensorImage = TensorImage.fromBitmap(bitmap)
+        tensorImage = imageProcessor.process(tensorImage)
 
-        // 1. Resize to 640x640
-        val resized = Bitmap.createScaledBitmap(bitmap, 640, 640, true)
+        // Prepare output buffers
+        val outputLocations = TensorBuffer.createFixedSize(outputLocationsShape, DataType.FLOAT32)
+        val outputClasses = TensorBuffer.createFixedSize(outputClassesShape, DataType.FLOAT32)
+        val outputScores = TensorBuffer.createFixedSize(outputScoresShape, DataType.FLOAT32)
+        val numDetections = TensorBuffer.createFixedSize(numDetectionsShape, DataType.FLOAT32)
 
-        // 2. Preprocess: [0..1] float, RGB, NHWC
-        val inputShape = interpreter.getInputTensor(0).shape()
-        val inputBuffer = ByteBuffer.allocateDirect(1 * 640 * 640 * 3 * 4)
-        inputBuffer.order(ByteOrder.nativeOrder())
-        inputBuffer.rewind()
+        // Run inference
+        val outputs = mapOf(
+            0 to outputLocations.buffer.rewind(),
+            1 to outputClasses.buffer.rewind(),
+            2 to outputScores.buffer.rewind(),
+            3 to numDetections.buffer.rewind()
+        )
+        interp.run(tensorImage.tensorBuffer.buffer.rewind(), outputs)
 
-        val pixels = IntArray(640 * 640)
-        resized.getPixels(pixels, 0, 640, 0, 0, 640, 640)
-        for (pixel in pixels) {
-            inputBuffer.putFloat(((pixel shr 16) and 0xFF) / 255.0f) // R
-            inputBuffer.putFloat(((pixel shr 8) and 0xFF) / 255.0f)  // G
-            inputBuffer.putFloat((pixel and 0xFF) / 255.0f)          // B
-        }
+        // Parse results
+        val locations = outputLocations.floatArray
+        val classes = outputClasses.floatArray
+        val scores = outputScores.floatArray
+        val num = numDetections.floatArray[0].toInt()
 
-        // 3. Run inference
-        val outputShape = interpreter.getOutputTensor(0).shape()
-        val numDetections = outputShape[2] // 8400
-        val numCoords = outputShape[1]     // 84 (4 bbox + 80 class)
-        val output = Array(1) { Array(numDetections) { FloatArray(numCoords) } }
-        interpreter.run(inputBuffer, output)
+        val results = mutableListOf<DetectionResult>()
+        for (i in 0 until num.coerceAtMost(100)) {
+            val confidence = scores[i]
+            if (confidence > 0.5f) {
+                val classId = classes[i].toInt()
+                val label = if (classId < labels.size) labels[classId] else "unknown"
 
-        // 4. Parse detections
-        val boxes = mutableListOf<BoundingBox>()
-        for (i in 0 until numDetections) {
-            val confidence = output[0][i][4]
-            if (confidence < 0.5f) continue
+                // Locations: [y1, x1, y2, x2] normalized [0,1]
+                val y1 = locations[i * 4]
+                val x1 = locations[i * 4 + 1]
+                val y2 = locations[i * 4 + 2]
+                val x2 = locations[i * 4 + 3]
 
-            var maxClassScore = 0f
-            var maxClassIdx = 0
-            for (j in 5 until numCoords) {
-                if (output[0][i][j] > maxClassScore) {
-                    maxClassScore = output[0][i][j]
-                    maxClassIdx = j - 5
-                }
+                val rect = RectF(
+                    x1 * bitmap.width,
+                    y1 * bitmap.height,
+                    x2 * bitmap.width,
+                    y2 * bitmap.height
+                )
+                results.add(DetectionResult(rect, label, confidence))
             }
-
-            val totalCnf = confidence * maxClassScore
-            if (totalCnf < 0.5f || maxClassIdx >= labels.size) continue
-
-            val cx = output[0][i][0]
-            val cy = output[0][i][1]
-            val w = output[0][i][2]
-            val h = output[0][i][3]
-
-            boxes.add(BoundingBox(
-                x1 = cx - w / 2, y1 = cy - h / 2,
-                x2 = cx + w / 2, y2 = cy + h / 2,
-                cx = cx, cy = cy, w = w, h = h,
-                cnf = totalCnf, cls = maxClassIdx,
-                label = labels.getOrElse(maxClassIdx) { "unknown" }
-            ))
         }
-
-        // 5. NMS
-        boxes.sortByDescending { it.cnf }
-        val selected = mutableListOf<BoundingBox>()
-        val iouThreshold = 0.45f
-
-        for (box in boxes) {
-            var keep = true
-            for (sel in selected) {
-                if (iou(box, sel) > iouThreshold && box.cls == sel.cls) {
-                    keep = false
-                    break
-                }
-            }
-            if (keep) selected.add(box)
-        }
-
-        // 6. Scale back to original bitmap size
-        val scaleX = bitmap.width.toFloat() / 640f
-        val scaleY = bitmap.height.toFloat() / 640f
-
-        return selected.map { box ->
-            DetectionResult(
-                rect = Rect(
-                    (box.x1 * scaleX).toInt().coerceAtLeast(0),
-                    (box.y1 * scaleY).toInt().coerceAtLeast(0),
-                    (box.x2 * scaleX).toInt().coerceAtMost(bitmap.width),
-                    (box.y2 * scaleY).toInt().coerceAtMost(bitmap.height)
-                ),
-                label = box.label,
-                confidence = box.cnf
-            )
-        }
-    }
-
-    private fun iou(a: BoundingBox, b: BoundingBox): Float {
-        val interX1 = maxOf(a.x1, b.x1)
-        val interY1 = maxOf(a.y1, b.y1)
-        val interX2 = minOf(a.x2, b.x2)
-        val interY2 = minOf(a.y2, b.y2)
-        val interArea = maxOf(0f, interX2 - interX1) * maxOf(0f, interY2 - interY1)
-        val areaA = (a.x2 - a.x1) * (a.y2 - a.y1)
-        val areaB = (b.x2 - b.x1) * (b.y2 - b.y1)
-        return interArea / (areaA + areaB - interArea)
-    }
-
-    private fun loadModelFile(filename: String): ByteBuffer {
-        val fd = context.assets.openFd(filename)
-        val inputStream = context.assets.open(filename)
-        val bytes = inputStream.readBytes()
-        inputStream.close()
-        return ByteBuffer.wrap(bytes)
-    }
-
-    private fun loadLabels(filename: String): List<String> {
-        val reader = BufferedReader(InputStreamReader(context.assets.open(filename)))
-        val result = reader.readLines()
-        reader.close()
-        return result
+        return results
     }
 
     fun close() {
