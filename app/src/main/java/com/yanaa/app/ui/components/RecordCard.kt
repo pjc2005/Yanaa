@@ -23,9 +23,16 @@ fun RecordCard(record: Record) {
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column(modifier = Modifier.weight(1f)) {
-                Text(record.category,
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.Medium)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(record.category,
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.Medium)
+                    if (record.subcategory.isNotEmpty()) {
+                        Text(" · ${record.subcategory}",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
                 Spacer(Modifier.height(4.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     if (record.note.isNotEmpty()) {
