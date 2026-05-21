@@ -3,32 +3,40 @@ package com.yanaa.app
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
+import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
-import androidx.lifecycle.viewmodel.compose.viewModel
-import com.yanaa.app.data.Record
-import com.yanaa.app.data.RecordViewModel
+import androidx.navigation.NavDestination.Companion.hierarchy
+import androidx.navigation.NavGraph.Companion.findStartDestination
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
+import androidx.navigation.compose.rememberNavController
+import com.yanaa.app.ui.navigation.BottomNavItem
+import com.yanaa.app.ui.screens.HomeTabScreen
+import com.yanaa.app.ui.screens.RecordsTabScreen
+import com.yanaa.app.ui.screens.StatsTabScreen
+import com.yanaa.app.ui.screens.ProfileTabScreen
 import com.yanaa.app.ui.theme.YanaaTheme
-import java.text.SimpleDateFormat
-import java.util.*
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        enableEdgeToEdge()
         setContent {
             YanaaTheme {
-                Surface(
-                    modifier = Modifier.fillMaxSize(),
-                    color = MaterialTheme.colorScheme.background
-                ) {
-                    BillListScreen()
+                Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+                    MainApp()
                 }
             }
         }
@@ -36,116 +44,50 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun BillListScreen(viewModel: RecordViewModel = viewModel()) {
-    val records by viewModel.allRecords.collectAsState(initial = emptyList())
-    val todayTotal by viewModel.todayTotal.collectAsState(initial = 0.0)
-    val monthTotal by viewModel.monthTotal.collectAsState(initial = 0.0)
+fun MainApp() {
+    val navController = rememberNavController()
+    val navBackStackEntry by navController.currentBackStackEntryAsState()
+    val currentDestination = navBackStackEntry?.destination
 
-    Column(modifier = Modifier.fillMaxSize()) {
-        // Summary card
-        Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.primaryContainer
-            )
-        ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Text("Yanaa 自动记账", style = MaterialTheme.typography.titleLarge)
-                Spacer(Modifier.height(8.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceEvenly
-                ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("今日", style = MaterialTheme.typography.bodySmall)
-                        Text(
-                            "¥${String.format("%.2f", todayTotal)}",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("本月", style = MaterialTheme.typography.bodySmall)
-                        Text(
-                            "¥${String.format("%.2f", monthTotal)}",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("笔数", style = MaterialTheme.typography.bodySmall)
-                        Text(
-                            "${records.size}",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
+    Scaffold(
+        bottomBar = {
+            NavigationBar {
+                BottomNavItem.items.forEach { item ->
+                    val selected = currentDestination?.hierarchy?.any { it.route == item.route } == true
+                    NavigationBarItem(
+                        selected = selected,
+                        onClick = {
+                            navController.navigate(item.route) {
+                                popUpTo(navController.graph.findStartDestination().id) {
+                                    saveState = true
+                                }
+                                launchSingleTop = true
+                                restoreState = true
+                            }
+                        },
+                        icon = { Icon(item.icon, contentDescription = item.title) },
+                        label = { Text(item.title) }
+                    )
                 }
             }
         }
-
-        // Record list
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) { innerPadding ->
+        NavHost(
+            navController = navController,
+            startDestination = BottomNavItem.Home.route,
+            modifier = Modifier.padding(innerPadding)
         ) {
-            items(records, key = { it.id }) { record ->
-                RecordListItem(record)
+            composable(BottomNavItem.Home.route) {
+                HomeTabScreen()
             }
-        }
-    }
-}
-
-@Composable
-fun RecordListItem(record: Record) {
-    val dateFormat = remember { SimpleDateFormat("MM/dd HH:mm", Locale.getDefault()) }
-
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = record.merchant.ifEmpty { "未知商户" },
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.Medium
-                )
-                Spacer(Modifier.height(4.dp))
-                Row {
-                    Text(
-                        text = record.category,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    Text(
-                        text = dateFormat.format(Date(record.timestamp)),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
+            composable(BottomNavItem.Records.route) {
+                RecordsTabScreen()
             }
-            Column(horizontalAlignment = Alignment.End) {
-                Text(
-                    text = "-¥${String.format("%.2f", record.amount)}",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.error
-                )
-                if (record.isAuto) {
-                    Text(
-                        text = "自动",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.tertiary
-                    )
-                }
+            composable(BottomNavItem.Stats.route) {
+                StatsTabScreen()
+            }
+            composable(BottomNavItem.Profile.route) {
+                ProfileTabScreen()
             }
         }
     }
