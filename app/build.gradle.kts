@@ -83,6 +83,13 @@ dependencies {
     implementation("androidx.room:room-ktx:2.6.1")
     ksp("androidx.room:room-compiler:2.6.1")
 
+    // TensorFlow Lite (YOLO)
+    implementation("org.tensorflow:tensorflow-lite:2.14.0")
+    implementation("org.tensorflow:tensorflow-lite-support:0.4.4")
+
+    // ML Kit Text Recognition (Chinese)
+    implementation("com.google.mlkit:text-recognition-chinese:16.0.1")
+
     // Core
     implementation("androidx.core:core-ktx:1.12.0")
 
