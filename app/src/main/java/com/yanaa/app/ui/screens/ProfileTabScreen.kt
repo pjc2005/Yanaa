@@ -1,6 +1,7 @@
 package com.yanaa.app.ui.screens
 
 import android.content.Context
+import android.content.Intent
 import android.net.Uri
 import android.provider.Settings
 import android.widget.Toast
@@ -14,6 +15,7 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -22,6 +24,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.yanaa.app.data.AppDatabase
 import com.yanaa.app.data.DataExporter
 import com.yanaa.app.data.RecordViewModel
+import com.yanaa.app.ui.BudgetActivity
+import com.yanaa.app.ui.SavingsPlanActivity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -183,6 +187,51 @@ fun ProfileTabScreen(viewModel: RecordViewModel = viewModel()) {
                             modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(6.dp))
                         Text("删除全部账单")
+                    }
+                }
+            }
+        }
+
+        // Finance management section
+        item {
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text("财务管理", style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold)
+                    Spacer(Modifier.height(12.dp))
+
+                    TextButton(
+                        onClick = {
+                            context.startActivity(Intent(context, BudgetActivity::class.java))
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(Icons.Default.AccountBalance, contentDescription = null,
+                            modifier = Modifier.size(20.dp),
+                            tint = MaterialTheme.colorScheme.primary)
+                        Spacer(Modifier.width(8.dp))
+                        Text("预算管理")
+                        Spacer(Modifier.weight(1f))
+                        Icon(Icons.Default.ChevronRight, contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+
+                    HorizontalDivider()
+
+                    TextButton(
+                        onClick = {
+                            context.startActivity(Intent(context, SavingsPlanActivity::class.java))
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(Icons.Default.Savings, contentDescription = null,
+                            modifier = Modifier.size(20.dp),
+                            tint = Color(0xFF4CAF50))
+                        Spacer(Modifier.width(8.dp))
+                        Text("攒钱计划")
+                        Spacer(Modifier.weight(1f))
+                        Icon(Icons.Default.ChevronRight, contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
             }

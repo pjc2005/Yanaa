@@ -29,9 +29,36 @@ interface RecordDao {
     @Query("SELECT * FROM records WHERE id = :id")
     suspend fun getById(id: Long): Record?
 
+    @Query("SELECT * FROM records WHERE timestamp BETWEEN :start AND :end ORDER BY timestamp DESC")
+    suspend fun getBetween(start: Long, end: Long): List<Record>
+
+    // Search & filter
+    @Query("""
+        SELECT * FROM records
+        WHERE (:keyword = '' OR note LIKE '%' || :keyword || '%'
+               OR category LIKE '%' || :keyword || '%'
+               OR subcategory LIKE '%' || :keyword || '%'
+               OR merchant LIKE '%' || :keyword || '%')
+          AND (:type = '' OR type = :type)
+          AND (:categoryFilter = '' OR category = :categoryFilter)
+          AND (:startTs = 0 OR timestamp >= :startTs)
+          AND (:endTs = 0 OR timestamp <= :endTs)
+        ORDER BY timestamp DESC
+    """)
+    suspend fun search(
+        keyword: String = "",
+        type: String = "",
+        categoryFilter: String = "",
+        startTs: Long = 0,
+        endTs: Long = 0
+    ): List<Record>
+
     @Query("DELETE FROM records")
     suspend fun deleteAll()
 
-    @Query("SELECT * FROM records WHERE timestamp BETWEEN :start AND :end ORDER BY timestamp DESC")
-    suspend fun getBetween(start: Long, end: Long): List<Record>
+    @Query("SELECT DISTINCT category FROM records WHERE type = 'expense'")
+    suspend fun getExpenseCategories(): List<String>
+
+    @Query("SELECT DISTINCT category FROM records WHERE type = 'income'")
+    suspend fun getIncomeCategories(): List<String>
 }

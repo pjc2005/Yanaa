@@ -30,6 +30,16 @@
             android:launchMode="singleTask"
             android:theme="@style/Theme.Yanaa" />
 
+        <activity
+            android:name=".ui.BudgetActivity"
+            android:excludeFromRecents="true"
+            android:theme="@style/Theme.Yanaa" />
+
+        <activity
+            android:name=".ui.SavingsPlanActivity"
+            android:excludeFromRecents="true"
+            android:theme="@style/Theme.Yanaa" />
+
         <service
             android:name=".service.AutoBillService"
             android:exported="true"
