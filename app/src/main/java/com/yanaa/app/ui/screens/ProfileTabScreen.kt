@@ -1,12 +1,16 @@
 package com.yanaa.app.ui.screens
 
-import android.content.Intent
+import android.content.Context
 import android.net.Uri
 import android.provider.Settings
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -14,10 +18,62 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.yanaa.app.data.AppDatabase
+import com.yanaa.app.data.DataExporter
+import com.yanaa.app.data.RecordViewModel
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @Composable
-fun ProfileTabScreen() {
+fun ProfileTabScreen(viewModel: RecordViewModel = viewModel()) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val records by viewModel.allRecords.collectAsState(initial = emptyList())
+
+    // Export: pick file location
+    val exportLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("application/json")
+    ) { uri: Uri? ->
+        if (uri != null) {
+            scope.launch {
+                try {
+                    val json = DataExporter.exportToJson(context, records)
+                    context.contentResolver.openOutputStream(uri)?.use { out ->
+                        out.write(json.toByteArray())
+                    }
+                    Toast.makeText(context, "导出成功 (${records.size}条)", Toast.LENGTH_SHORT).show()
+                } catch (e: Exception) {
+                    Toast.makeText(context, "导出失败: ${e.message}", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+    }
+
+    // Import: pick file
+    val importLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            scope.launch {
+                try {
+                    val imported = withContext(Dispatchers.IO) {
+                        DataExporter.importFromJson(context, uri)
+                    }
+                    if (imported.isNotEmpty()) {
+                        val db = AppDatabase.getInstance(context)
+                        db.recordDao().insertAll(imported)
+                        Toast.makeText(context, "导入成功 (${imported.size}条)", Toast.LENGTH_SHORT).show()
+                    } else {
+                        Toast.makeText(context, "文件中没有有效记录", Toast.LENGTH_SHORT).show()
+                    }
+                } catch (e: Exception) {
+                    Toast.makeText(context, "导入失败: ${e.message}", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+    }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -39,6 +95,52 @@ fun ProfileTabScreen() {
             Spacer(Modifier.height(16.dp))
         }
 
+        // Data management section
+        item {
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text("数据管理", style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold)
+                    Spacer(Modifier.height(8.dp))
+                    Text("共 ${records.size} 条记录", style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Spacer(Modifier.height(12.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        OutlinedButton(
+                            onClick = {
+                                val filename = "Yanaa_${java.text.SimpleDateFormat(
+                                    "yyyyMMdd_HHmmss", java.util.Locale.getDefault()
+                                ).format(java.util.Date())}.json"
+                                exportLauncher.launch(filename)
+                            },
+                            modifier = Modifier.weight(1f),
+                            enabled = records.isNotEmpty()
+                        ) {
+                            Icon(Icons.Default.FileUpload, contentDescription = null,
+                                modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("导出")
+                        }
+                        OutlinedButton(
+                            onClick = {
+                                importLauncher.launch(arrayOf("application/json", "*/*"))
+                            },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(Icons.Default.FileDownload, contentDescription = null,
+                                modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("导入")
+                        }
+                    }
+                }
+            }
+        }
+
         // Settings section
         item {
             Card(modifier = Modifier.fillMaxWidth()) {
@@ -49,7 +151,7 @@ fun ProfileTabScreen() {
 
                     TextButton(
                         onClick = {
-                            context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+                            context.startActivity(android.content.Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
                         },
                         modifier = Modifier.fillMaxWidth()
                     ) {
@@ -62,8 +164,8 @@ fun ProfileTabScreen() {
 
                     TextButton(
                         onClick = {
-                            context.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-                                data = Uri.parse("package:com.yanaa.app")
+                            context.startActivity(android.content.Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                                data = android.net.Uri.parse("package:com.yanaa.app")
                             })
                         },
                         modifier = Modifier.fillMaxWidth()
