@@ -14,6 +14,11 @@ import java.util.*
 @Composable
 fun RecordCard(record: Record) {
     val dateFormat = remember { SimpleDateFormat("MM/dd HH:mm", Locale.getDefault()) }
+    val isExpense = record.type == "expense"
+    val amountColor = if (isExpense) MaterialTheme.colorScheme.error
+                      else MaterialTheme.colorScheme.tertiary
+    val prefix = if (isExpense) "-" else "+"
+
     Card(modifier = Modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier
@@ -47,10 +52,10 @@ fun RecordCard(record: Record) {
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
-            Text("-¥${"%.2f".format( record.amount)}",
+            Text("${prefix}¥${"%.2f".format(record.amount)}",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.error)
+                color = amountColor)
         }
     }
 }

@@ -3,10 +3,11 @@ package com.yanaa.app.data
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import java.util.*
+
+enum class Period { WEEK, MONTH, YEAR }
 
 class RecordViewModel(application: Application) : AndroidViewModel(application) {
     private val db = AppDatabase.getInstance(application)
@@ -14,29 +15,68 @@ class RecordViewModel(application: Application) : AndroidViewModel(application) 
 
     val allRecords: Flow<List<Record>> = dao.getAll()
 
-    private val _todayTotal = MutableStateFlow(0.0)
-    val todayTotal: StateFlow<Double> = _todayTotal
+    private val _period = MutableStateFlow(Period.MONTH)
+    val period: StateFlow<Period> = _period
 
-    private val _monthTotal = MutableStateFlow(0.0)
-    val monthTotal: StateFlow<Double> = _monthTotal
+    private val _expense = MutableStateFlow(0.0)
+    val expense: StateFlow<Double> = _expense
+
+    private val _income = MutableStateFlow(0.0)
+    val income: StateFlow<Double> = _income
+
+    private val _balance = MutableStateFlow(0.0)
+    val balance: StateFlow<Double> = _balance
+
+    private val _count = MutableStateFlow(0)
+    val count: StateFlow<Int> = _count
 
     init {
         viewModelScope.launch {
-            allRecords.collect { records ->
-                val now = System.currentTimeMillis()
-                val dayStart = now - (now % 86400000L)
-                val monthStart = now - (now % 86400000L) - ((java.util.Calendar.getInstance().get(java.util.Calendar.DAY_OF_MONTH) - 1) * 86400000L)
+            combine(allRecords, period) { records, p -> records to p }
+                .collect { (records, p) ->
+                    val cal = Calendar.getInstance()
+                    val now = System.currentTimeMillis()
 
-                _todayTotal.value = records
-                    .filter { it.timestamp >= dayStart }
-                    .sumOf { it.amount }
+                    val startMillis = when (p) {
+                        Period.WEEK -> {
+                            cal.timeInMillis = now
+                            cal.set(Calendar.DAY_OF_WEEK, cal.firstDayOfWeek)
+                            cal.set(Calendar.HOUR_OF_DAY, 0)
+                            cal.set(Calendar.MINUTE, 0)
+                            cal.set(Calendar.SECOND, 0)
+                            cal.set(Calendar.MILLISECOND, 0)
+                            cal.timeInMillis
+                        }
+                        Period.MONTH -> {
+                            cal.timeInMillis = now
+                            cal.set(Calendar.DAY_OF_MONTH, 1)
+                            cal.set(Calendar.HOUR_OF_DAY, 0)
+                            cal.set(Calendar.MINUTE, 0)
+                            cal.set(Calendar.SECOND, 0)
+                            cal.set(Calendar.MILLISECOND, 0)
+                            cal.timeInMillis
+                        }
+                        Period.YEAR -> {
+                            cal.timeInMillis = now
+                            cal.set(Calendar.DAY_OF_YEAR, 1)
+                            cal.set(Calendar.HOUR_OF_DAY, 0)
+                            cal.set(Calendar.MINUTE, 0)
+                            cal.set(Calendar.SECOND, 0)
+                            cal.set(Calendar.MILLISECOND, 0)
+                            cal.timeInMillis
+                        }
+                    }
 
-                _monthTotal.value = records
-                    .filter { it.timestamp >= monthStart }
-                    .sumOf { it.amount }
-            }
+                    val filtered = records.filter { it.timestamp >= startMillis }
+                    _expense.value = filtered.filter { it.type == "expense" }.sumOf { it.amount }
+                    _income.value = filtered.filter { it.type == "income" }.sumOf { it.amount }
+                    _balance.value = _income.value - _expense.value
+                    _count.value = filtered.size
+                }
         }
     }
+
+    fun setPeriod(p: Period) { _period.value = p }
 
     fun insert(record: Record, onDone: () -> Unit = {}) {
         viewModelScope.launch {

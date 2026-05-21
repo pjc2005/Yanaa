@@ -14,6 +14,7 @@ object DataExporter {
         records.forEach { r ->
             arr.put(JSONObject().apply {
                 put("amount", r.amount)
+                put("type", r.type)
                 put("category", r.category)
                 put("subcategory", r.subcategory)
                 put("note", r.note)
@@ -53,10 +54,11 @@ object DataExporter {
             try {
                 val obj = arr.getJSONObject(i)
                 val type = obj.optString("type", "支出")
-                // Only import expenses (支出); skip income (收入) for now
-                if (type != "支出") continue
-
                 val money = obj.optDouble("money", 0.0)
+                val recordType = when (type) {
+                    "收入" -> "income"
+                    else -> "expense"
+                }
                 val category = obj.optString("category", "其他")
                 val dateStr = obj.optString("date", "")
                 val timestamp = try {
@@ -67,6 +69,7 @@ object DataExporter {
 
                 records.add(Record(
                     amount = money,
+                    type = recordType,
                     category = category,
                     subcategory = "",
                     note = "",

@@ -7,9 +7,10 @@ import androidx.room.PrimaryKey
 data class Record(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val amount: Double,
-    val merchant: String = "",
+    val type: String = "expense", // "expense" or "income"
     val category: String,
     val subcategory: String = "",
+    val merchant: String = "",
     val note: String = "",
     val timestamp: Long = System.currentTimeMillis(),
     val isAuto: Boolean = false

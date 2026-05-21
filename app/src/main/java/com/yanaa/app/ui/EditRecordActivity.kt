@@ -77,6 +77,7 @@ fun EditRecordScreen(
     var note by remember { mutableStateOf("") }
     var selectedCategory by remember { mutableStateOf("") }
     var selectedSubcategory by remember { mutableStateOf("") }
+    var recordType by remember { mutableStateOf("expense") }
     var showDatePicker by remember { mutableStateOf(false) }
     var showTimePicker by remember { mutableStateOf(false) }
     var selectedDate by remember { mutableStateOf(System.currentTimeMillis()) }
@@ -105,6 +106,7 @@ fun EditRecordScreen(
                         if (amountValue > 0 && selectedCategory.isNotEmpty()) {
                             onSave(Record(
                                 amount = amountValue,
+                                type = recordType,
                                 category = selectedCategory,
                                 subcategory = selectedSubcategory,
                                 note = note,
@@ -146,6 +148,22 @@ fun EditRecordScreen(
                 modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
                 shape = MaterialTheme.shapes.medium
             )
+
+            Spacer(Modifier.height(12.dp))
+
+            // Expense / Income toggle
+            SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                SegmentedButton(
+                    selected = recordType == "expense",
+                    onClick = { recordType = "expense" },
+                    shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2)
+                ) { Text("支出") }
+                SegmentedButton(
+                    selected = recordType == "income",
+                    onClick = { recordType = "income" },
+                    shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)
+                ) { Text("收入") }
+            }
 
             Spacer(Modifier.height(20.dp))
 

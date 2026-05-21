@@ -17,7 +17,7 @@ import java.util.*
 @Composable
 fun StatsTabScreen(viewModel: RecordViewModel = viewModel()) {
     val records by viewModel.allRecords.collectAsState(initial = emptyList())
-    val monthTotal by viewModel.monthTotal.collectAsState(initial = 0.0)
+    val expense by viewModel.expense.collectAsState(initial = 0.0)
 
     // Calculate category breakdown
     val categoryStats = remember(records) {
@@ -71,7 +71,7 @@ fun StatsTabScreen(viewModel: RecordViewModel = viewModel()) {
                 Column(modifier = Modifier.padding(20.dp)) {
                     Text("本月总支出", style = MaterialTheme.typography.titleMedium,
                         color = MaterialTheme.colorScheme.onTertiaryContainer)
-                    Text("¥${"%.2f".format( monthTotal)}",
+                    Text("¥${"%.2f".format( expense)}",
                         style = MaterialTheme.typography.headlineLarge,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onTertiaryContainer)

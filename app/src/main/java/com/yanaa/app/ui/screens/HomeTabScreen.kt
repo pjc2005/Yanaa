@@ -10,21 +10,49 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.yanaa.app.data.Period
 import com.yanaa.app.data.RecordViewModel
 import com.yanaa.app.ui.components.RecordCard
 
 @Composable
 fun HomeTabScreen(viewModel: RecordViewModel = viewModel()) {
     val records by viewModel.allRecords.collectAsState(initial = emptyList())
-    val todayTotal by viewModel.todayTotal.collectAsState(initial = 0.0)
-    val monthTotal by viewModel.monthTotal.collectAsState(initial = 0.0)
+    val expense by viewModel.expense.collectAsState(initial = 0.0)
+    val income by viewModel.income.collectAsState(initial = 0.0)
+    val balance by viewModel.balance.collectAsState(initial = 0.0)
+    val count by viewModel.count.collectAsState(initial = 0)
+    val currentPeriod by viewModel.period.collectAsState()
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        // Monthly summary hero card
+        // Period selector
+        item {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Period.entries.forEach { p ->
+                    val selected = currentPeriod == p
+                    FilterChip(
+                        selected = selected,
+                        onClick = { viewModel.setPeriod(p) },
+                        label = {
+                            Text(when (p) {
+                                Period.WEEK -> "本周"
+                                Period.MONTH -> "本月"
+                                Period.YEAR -> "本年"
+                            })
+                        },
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+            }
+        }
+
+        // Summary card
         item {
             Card(
                 colors = CardDefaults.cardColors(
@@ -33,29 +61,74 @@ fun HomeTabScreen(viewModel: RecordViewModel = viewModel()) {
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(modifier = Modifier.padding(20.dp)) {
-                    Text("本月支出",
+                    // Period label
+                    Text(
+                        when (currentPeriod) {
+                            Period.WEEK -> "本周概览"
+                            Period.MONTH -> "本月概览"
+                            Period.YEAR -> "本年概览"
+                        },
                         style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer)
-                    Text("¥${"%.2f".format( monthTotal)}",
-                        style = MaterialTheme.typography.headlineLarge,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer,
-                        modifier = Modifier.padding(top = 4.dp))
+                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
                     Spacer(Modifier.height(16.dp))
+
+                    // Balance (large)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.Bottom
+                    ) {
+                        Column {
+                            Text("结余",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f))
+                            Text(
+                                "¥${String.format("%,.2f", balance)}",
+                                style = MaterialTheme.typography.headlineLarge,
+                                fontWeight = FontWeight.Bold,
+                                color = if (balance >= 0) MaterialTheme.colorScheme.onPrimaryContainer
+                                       else MaterialTheme.colorScheme.error
+                            )
+                        }
+                        Column(horizontalAlignment = Alignment.End) {
+                            Text("${count}笔",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f))
+                        }
+                    }
+
+                    Spacer(Modifier.height(20.dp))
+
+                    // Income & Expense row
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceEvenly
                     ) {
-                        StatChip("今日", "¥${"%.2f".format( todayTotal)}")
-                        StatChip("笔数", "${records.size}")
-                        StatChip("日均", if (records.isNotEmpty())
-                            "¥${"%.2f".format( monthTotal / maxOf(1, records.size))}" else "¥0")
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text("支出",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.6f))
+                            Text("¥${String.format("%,.2f", expense)}",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.error)
+                        }
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text("收入",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.6f))
+                            Text("¥${String.format("%,.2f", income)}",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.tertiary)
+                        }
                     }
                 }
             }
         }
 
-        // Recent transactions header
+        // Recent records header
         item {
             Text("最近记录",
                 style = MaterialTheme.typography.titleLarge,
@@ -78,16 +151,5 @@ fun HomeTabScreen(viewModel: RecordViewModel = viewModel()) {
                 RecordCard(record)
             }
         }
-    }
-}
-
-@Composable
-private fun StatChip(label: String, value: String) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(label, style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f))
-        Text(value, style = MaterialTheme.typography.titleSmall,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onPrimaryContainer)
     }
 }
