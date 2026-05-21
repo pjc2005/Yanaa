@@ -37,12 +37,46 @@ class AutoBillService : AccessibilityService() {
         val packageName = event.packageName?.toString() ?: return
         if (packageName != ALIPAY_PACKAGE && packageName != WECHAT_PACKAGE) return
 
+        // Extract text directly from the event (most reliable across vendors)
+        val eventTexts = mutableListOf<String>()
+        if (event.text != null) {
+            for (i in event.text.indices) {
+                event.text[i]?.toString()?.takeIf { it.isNotBlank() }?.let { eventTexts.add(it) }
+            }
+        }
+        event.contentDescription?.toString()?.takeIf { it.isNotBlank() }?.let { eventTexts.add(it) }
+
         val now = System.currentTimeMillis()
         if (packageName == lastProcessedPackage && (now - lastProcessedTime) < debounceInterval) return
 
         lastProcessedPackage = packageName
         lastProcessedTime = now
 
+        // Try to extract payment info from event text immediately
+        var amountText = ""
+        var merchantText = ""
+        var isPaymentPage = false
+
+        for (text in eventTexts) {
+            if (text.contains("支付成功") || text.contains("付款成功") || text.contains("支付金额")) {
+                isPaymentPage = true
+            }
+            val amountMatch = Regex("[¥￥]?\\d+\\.?\\d{0,2}[元]?").find(text)
+            if (amountMatch != null && amountText.isEmpty()) {
+                amountText = amountMatch.value.filter { it.isDigit() || it == '.' }
+            }
+            if (text.contains("商户") || text.contains("收款方") || text.contains("商家")) {
+                val parts = text.split("商户|收款方|商家".toRegex())
+                if (parts.size >= 2) merchantText = parts[1].trim()
+            }
+        }
+
+        if (isPaymentPage || amountText.isNotEmpty()) {
+            showEditDialog(amountText, merchantText, packageName)
+            return
+        }
+
+        // Fallback: try screenshot + accessibility tree after a delay
         mainHandler.postDelayed({
             captureAndAnalyze(packageName)
         }, 1200)
