@@ -30,7 +30,18 @@ class RecordViewModel(application: Application) : AndroidViewModel(application) 
     private val _count = MutableStateFlow(0)
     val count: StateFlow<Int> = _count
 
+    // Totals (all-time, no filter)
+    private val _totalExpense = MutableStateFlow(0.0)
+    val totalExpense: StateFlow<Double> = _totalExpense
+    private val _totalIncome = MutableStateFlow(0.0)
+    val totalIncome: StateFlow<Double> = _totalIncome
+    private val _totalBalance = MutableStateFlow(0.0)
+    val totalBalance: StateFlow<Double> = _totalBalance
+    private val _totalCount = MutableStateFlow(0)
+    val totalCount: StateFlow<Int> = _totalCount
+
     init {
+        // Period-filtered stats
         viewModelScope.launch {
             combine(allRecords, period) { records, p -> records to p }
                 .collect { (records, p) ->
@@ -73,6 +84,16 @@ class RecordViewModel(application: Application) : AndroidViewModel(application) 
                     _balance.value = _income.value - _expense.value
                     _count.value = filtered.size
                 }
+        }
+
+        // All-time totals
+        viewModelScope.launch {
+            allRecords.collect { records ->
+                _totalExpense.value = records.filter { it.type == "expense" }.sumOf { it.amount }
+                _totalIncome.value = records.filter { it.type == "income" }.sumOf { it.amount }
+                _totalBalance.value = _totalIncome.value - _totalExpense.value
+                _totalCount.value = records.size
+            }
         }
     }
 

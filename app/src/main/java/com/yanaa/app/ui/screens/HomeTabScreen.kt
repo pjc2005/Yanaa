@@ -132,6 +132,55 @@ fun HomeTabScreen(viewModel: RecordViewModel = viewModel()) {
             }
         }
 
+        // Total summary card (all-time)
+        item {
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text("累计 (全部)",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Spacer(Modifier.height(12.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceEvenly
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            val totalExp by viewModel.totalExpense.collectAsState(initial = 0.0)
+                            Text("支出",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text("¥${String.format("%,.2f", totalExp)}",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.error)
+                        }
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            val totalInc by viewModel.totalIncome.collectAsState(initial = 0.0)
+                            Text("收入",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text("¥${String.format("%,.2f", totalInc)}",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.tertiary)
+                        }
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            val totalBal by viewModel.totalBalance.collectAsState(initial = 0.0)
+                            Text("结余",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text("¥${String.format("%,.2f", totalBal)}",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = if (totalBal >= 0) MaterialTheme.colorScheme.primary
+                                       else MaterialTheme.colorScheme.error)
+                        }
+                    }
+                }
+            }
+        }
+
         // Recent records header
         item {
             Text("最近记录",
