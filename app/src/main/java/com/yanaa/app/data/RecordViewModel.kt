@@ -84,4 +84,11 @@ class RecordViewModel(application: Application) : AndroidViewModel(application) 
             onDone()
         }
     }
+
+    fun deleteAll(onDone: () -> Unit = {}) {
+        viewModelScope.launch {
+            dao.deleteAll()
+            onDone()
+        }
+    }
 }

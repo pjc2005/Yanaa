@@ -137,6 +137,53 @@ fun ProfileTabScreen(viewModel: RecordViewModel = viewModel()) {
                             Text("导入")
                         }
                     }
+
+                    Spacer(Modifier.height(12.dp))
+
+                    // Delete all records
+                    var showDeleteAllDialog by remember { mutableStateOf(false) }
+                    if (showDeleteAllDialog) {
+                        AlertDialog(
+                            onDismissRequest = { showDeleteAllDialog = false },
+                            title = { Text("删除全部账单") },
+                            text = {
+                                Text("确定要删除全部 ${records.size} 条记录吗？\n此操作不可撤销。")
+                            },
+                            confirmButton = {
+                                TextButton(
+                                    onClick = {
+                                        showDeleteAllDialog = false
+                                        viewModel.deleteAll {
+                                            Toast.makeText(context, "已删除全部账单", Toast.LENGTH_SHORT).show()
+                                        }
+                                    },
+                                    colors = ButtonDefaults.textButtonColors(
+                                        contentColor = MaterialTheme.colorScheme.error
+                                    )
+                                ) {
+                                    Text("删除")
+                                }
+                            },
+                            dismissButton = {
+                                TextButton(onClick = { showDeleteAllDialog = false }) {
+                                    Text("取消")
+                                }
+                            }
+                        )
+                    }
+                    TextButton(
+                        onClick = { showDeleteAllDialog = true },
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = records.isNotEmpty(),
+                        colors = ButtonDefaults.textButtonColors(
+                            contentColor = MaterialTheme.colorScheme.error
+                        )
+                    ) {
+                        Icon(Icons.Default.Delete, contentDescription = null,
+                            modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("删除全部账单")
+                    }
                 }
             }
         }

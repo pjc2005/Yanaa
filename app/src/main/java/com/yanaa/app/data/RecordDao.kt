@@ -29,6 +29,9 @@ interface RecordDao {
     @Query("SELECT * FROM records WHERE id = :id")
     suspend fun getById(id: Long): Record?
 
+    @Query("DELETE FROM records")
+    suspend fun deleteAll()
+
     @Query("SELECT * FROM records WHERE timestamp BETWEEN :start AND :end ORDER BY timestamp DESC")
     suspend fun getBetween(start: Long, end: Long): List<Record>
 }
