@@ -1,11 +1,15 @@
 package com.yanaa.app
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
@@ -16,12 +20,14 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.yanaa.app.ui.EditRecordActivity
 import com.yanaa.app.ui.navigation.BottomNavItem
 import com.yanaa.app.ui.screens.HomeTabScreen
 import com.yanaa.app.ui.screens.RecordsTabScreen
@@ -48,6 +54,7 @@ fun MainApp() {
     val navController = rememberNavController()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
+    val context = LocalContext.current
 
     Scaffold(
         bottomBar = {
@@ -69,6 +76,21 @@ fun MainApp() {
                         label = { Text(item.title) }
                     )
                 }
+            }
+        },
+        floatingActionButton = {
+            FloatingActionButton(
+                onClick = {
+                    val intent = Intent(context, EditRecordActivity::class.java).apply {
+                        putExtra("amount", "")
+                        putExtra("merchant", "")
+                        putExtra("source", "manual")
+                    }
+                    context.startActivity(intent)
+                },
+                containerColor = MaterialTheme.colorScheme.primary
+            ) {
+                Icon(Icons.Default.Add, contentDescription = "添加记录")
             }
         }
     ) { innerPadding ->
